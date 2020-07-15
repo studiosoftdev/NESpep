@@ -40,9 +40,10 @@ int main(int argc, char *argv[])
     while(!errorstate){
         unsigned int instruction; //max 4 bytes per instruction
         unsigned char opcode = CMEM[PC];
+        //cout << hex << int(opcode) << endl;
         switch(opcode){
-            case 0x20:
-                instruction = CMEM[PC] << 16 | CMEM[PC+1] << 8 | CMEM[PC+2];
+            case 0x20: //JSR - Jump to New location saving return address
+                instruction = CMEM[PC] << 16 | CMEM[PC+1] << 8 | CMEM[PC+2]; //plcaing the 3 bytes necessary into the instruction, opcode + operand
                 SP++;
                 CMEM[SP] = (PC & 0xFF00) >> 8;
                 SP++;
@@ -50,6 +51,18 @@ int main(int argc, char *argv[])
                 cout << hex << "MEMADDR: " << PC << " -> " << 0x8000+(instruction & 0xFFFF) << " | " << ((instruction & 0xFF0000) >> 16) << " " << (instruction & 0x00FFFF) << " | JSR (abs)" << endl;
                 PC = 0x8000 + (instruction & 0xFFFF);
                 break;
+            case 0x30: //BMI - branch if minus (N = 1)
+                instruction = CMEM[PC] << 8 | CMEM[PC+1] ;
+                if(REG[7] == 1){
+                    cout << hex << "MEMADDR: " << PC << " -> " << CMEM[PC]+(instruction&0x00FF) << " | " << ((instruction & 0xFF00) >> 8) << " " << (instruction & 0x00FF) << " | " << "BMI (rel)" << endl;
+                    PC += instruction & 0x00FF;
+                }
+                else{
+                    cout << hex << "PC: " << PC << " -> " << PC + 1 << " | N: " << REG[7] << " | BMI (rel)" << endl;
+                    PC++;
+                }
+                break;
+
             default: cout << "Unknown opcode" << endl;
                      instruction = CMEM[PC] << 24 | CMEM[PC+1] << 16 | CMEM[PC+2] << 8 | CMEM[PC+3];
                      cout << hex << "Bytes: " << instruction <<endl;
