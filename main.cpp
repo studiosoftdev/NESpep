@@ -18,8 +18,8 @@ unsigned char header [16];
 unsigned char mapper;
 unsigned char CMEM [0xFFFF];
 unsigned char GMEM [0x3FFF];
-bool REG [7]; // C Z I D B V N in order
-unsigned char A = 0, B = 0, C = 0;
+int REG [7] = {0,0,0,0,0,0,0}; // C Z I D B V N in order
+unsigned char A = 0, X = 0, Y = 0;
 unsigned short PC = 0x8000, SP = 0x100;
 
 /* Program entry point */
@@ -43,25 +43,39 @@ int main(int argc, char *argv[])
         //cout << hex << int(opcode) << endl;
         switch(opcode){
             case 0x20: //JSR - Jump to New location saving return address
-                instruction = CMEM[PC] << 16 | CMEM[PC+1] << 8 | CMEM[PC+2]; //plcaing the 3 bytes necessary into the instruction, opcode + operand
+                {instruction = CMEM[PC] << 16 | CMEM[PC+1] << 8 | CMEM[PC+2]; //plcaing the 3 bytes necessary into the instruction, opcode + operand
                 SP++;
-                CMEM[SP] = (PC & 0xFF00) >> 8;
+                CMEM[SP] = ((PC+2) & 0xFF00) >> 8; //need +2 to push the address of the instruction AFTER this JSR to the stack
                 SP++;
-                CMEM[SP] = PC & 0x00FF;
-                cout << hex << "MEMADDR: " << PC << " -> " << 0x8000+(instruction & 0xFFFF) << " | " << ((instruction & 0xFF0000) >> 16) << " " << (instruction & 0x00FFFF) << " | JSR (abs)" << endl;
+                CMEM[SP] = (PC+2) & 0x00FF; //see above comment
+                cout << hex << "PC: " << PC << " -> " << 0x8000+(instruction & 0xFFFF) << "\t | " << ((instruction & 0xFF0000) >> 16) << " " << (instruction & 0x00FFFF) << "\t\t | JSR (abs)" << endl;
                 PC = 0x8000 + (instruction & 0xFFFF);
-                break;
+                break;}
             case 0x30: //BMI - branch if minus (N = 1)
-                instruction = CMEM[PC] << 8 | CMEM[PC+1] ;
+                {instruction = CMEM[PC] << 8 | CMEM[PC+1] ;
                 if(REG[7] == 1){
-                    cout << hex << "MEMADDR: " << PC << " -> " << CMEM[PC]+(instruction&0x00FF) << " | " << ((instruction & 0xFF00) >> 8) << " " << (instruction & 0x00FF) << " | " << "BMI (rel)" << endl;
+                    cout << hex << "PC: " << PC << " -> " << CMEM[PC]+(instruction&0x00FF) << "\t | " << ((instruction & 0xFF00) >> 8) << " " << (instruction & 0x00FF) << "\t\t | BMI (rel)" << endl;
                     PC += instruction & 0x00FF;
                 }
                 else{
-                    cout << hex << "PC: " << PC << " -> " << PC + 1 << " | N: " << REG[7] << " | BMI (rel)" << endl;
-                    PC++;
+                    cout << hex << "PC: " << PC << " -> " << PC + 2 << "\t | " << ((instruction & 0xFF00) >> 8) << " " << (instruction & 0x00FF) << "\t | N: " << REG[7] << "\t\t | BMI (rel)" << endl;
+                    PC+=2;
                 }
-                break;
+                break;}
+            case 0x36: // ###UNTESTED### ROL - ROtate Left (set N if , set Z if result is 0, set C as the bit that is shifted out)
+                {instruction = CMEM[PC] << 8 | CMEM[PC+1];
+                long data = CMEM[(X + (instruction & 0x00FF)) & 0x0FF] * 2;  //consequence of zero paged index (in the index), multiply by 2 for shift
+                data += REG[0]; //adding in the carry as the lowest bit
+                REG[0] = data & 0x0F00 >> 16; //moving the shifted out bit to the carry
+                cout << hex << "PC: " << PC << " -> " << PC + 2 << "\t | " << ((instruction & 0xFF00) >> 8) << " " << (instruction & 0x00FF) << "\t | temp: C: N: Z: " << "\t | ROL (zpg)" << endl;
+                break;}
+            case 0x60: //RTS - Return To Subroutine. Pulls 2 bytes off the stack to be the PC.
+                {instruction = CMEM[PC];
+                short oldPC = PC;
+                PC = (CMEM[SP-1] << 8) | CMEM[SP];
+                SP-=2;
+                cout << hex << "PC: " << oldPC << " -> " << PC << "\t | " << (instruction & 0x00FF) << "\t\t\t | RTS (abs)" << endl;
+                break;}
 
             default: cout << "Unknown opcode" << endl;
                      instruction = CMEM[PC] << 24 | CMEM[PC+1] << 16 | CMEM[PC+2] << 8 | CMEM[PC+3];
