@@ -74,7 +74,12 @@ int main(int argc, char *argv[])
                 short oldPC = PC;
                 PC = (CMEM[SP-1] << 8) | CMEM[SP];
                 SP-=2;
-                cout << hex << "PC: " << oldPC << " -> " << PC << "\t | " << (instruction & 0x00FF) << "\t\t\t | RTS (abs)" << endl;
+                cout << hex << "PC: " << oldPC << " -> " << PC << "\t | " << instruction << "\t\t\t | RTS (abs)" << endl;
+                break;}
+            case 0xEA: //NOP - No OP. Do nothing for 2 cycles.
+                {instruction = CMEM[PC];
+                cout << hex << "PC: " << PC << " -> " << PC+1 << "\t | " << instruction << "\t\t\t | NOP (imp)" << endl;
+                PC++;
                 break;}
 
             default: cout << "Unknown opcode" << endl;
