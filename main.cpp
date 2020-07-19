@@ -19,8 +19,8 @@ unsigned char mapper;
 unsigned char CMEM [0xFFFF];
 unsigned char GMEM [0x3FFF];
 int REG [8] = {0,0,0,0,0,0,0,0}; /// C Z I D BB V N in order
-unsigned char A = 0, X = 0, Y = 0;
-unsigned short PC = 0x8000, SP = 0x100; //starts at 0x100 in RAM.
+unsigned char A = 0, X = 0, Y = 0, P = 0x34;
+unsigned short PC = 0x0000, SP = 0x100; //starts at 0x100 in RAM.
 
 /* Program entry point */
 
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
                 SP++;
                 CMEM[SP] = (PC+2) & 0x00FF; //see above comment
                 cout << hex << "PC: " << PC << " -> " << (instruction & 0xFFFF) << "\t | " << ((instruction & 0xFF0000) >> 16) << " " << (instruction & 0x00FFFF) << "\t | JSR (abs)" << endl;
-                PC = (instruction & 0xFFFF);
+                PC = 0x8000 + (instruction & 0xFFFF);
                 break;}
             case 0x30: ///BMI - branch if minus (N = 1)
                 {instruction = CMEM[PC] << 8 | CMEM[PC+1] ;
@@ -70,7 +70,13 @@ int main(int argc, char *argv[])
                 if(data & 0x00FF){REG[1] = 1;} //setting Z = 1 if result = 0
                 else{REG[1] = 0;}
                 REG[7] = data & 0x040; //retrieving bit 7 and putting that in the N register
-                cout << hex << "PC: " << PC << " -> " << PC + 2 << "\t | " << ((instruction & 0xFF00) >> 8) << " " << (instruction & 0x00FF) << "\t | ROL (zpg)" << "\t | temp: C: N: Z:" << REG[1] << endl;
+                cout << hex << "PC: " << PC << " -> " << PC + 2 << "\t | " << ((instruction & 0xFF00) >> 8) << " " << (instruction & 0x00FF) << "\t | ROL (zpg)\t | temp: C: N: Z:" << REG[1] << endl;
+                break;}
+            case 0x4C: ///JMP - JuMP. Set PC to operand. 3 bytes.
+                {instruction = CMEM[PC] << 16 | CMEM[PC+1] << 8 | CMEM[PC];
+                cout << hex << "PC: " << PC << " -> ";
+                PC = instruction& 0x00FFFF;
+                cout << hex << PC << "\t | " << ((instruction & 0xFF0000) >> 16) << " " << (instruction & 0x00FFFF) << "\t | JMP (abs)" << endl;
                 break;}
             case 0x60: ///RTS - Return To Subroutine. Pulls 2 bytes off the stack to be the PC.
                 {instruction = CMEM[PC];
@@ -119,7 +125,7 @@ int main(int argc, char *argv[])
                 cout << PC << "\t | " << ((instruction & 0xFF00) >> 8) << " " << (instruction & 0x00FF) << "\t\t | BEQ (rel)" << endl;
                 break;}
 
-            default: cout << "Unknown opcode" << endl;
+            default: cout << hex << "PC: " << PC << ". Unknown opcode" << endl;
                      instruction = CMEM[PC] << 24 | CMEM[PC+1] << 16 | CMEM[PC+2] << 8 | CMEM[PC+3];
                      cout << hex << "Bytes: " << instruction <<endl;
                      errorstate = true; break;
@@ -165,12 +171,21 @@ char loadGame(const char *filename){
         switch(header[6] >> 4){
             case 0x0: mapper = '0'; cout << "Mapper = 0" << endl;
                 //copy prgrom into mem starting at 0x8000. mapper 0 is just a straight copy paste
-                for(int i = 0; i < prglen; i++){
-                    CMEM[i + 0x8000] = buffer[i + 0x10];
+                if(header[5] == 2){ //if NROM 256
+                    for(int i = 0; i < prglen; i++){
+                        CMEM[i + 0x8000] = buffer[i + 0x10];
+                    }
+                }
+                else if(header[5] == 1){ //if NROM 128
+                    for(int i = 0; i < prglen; i++){
+                        CMEM[i+0x8000] = buffer[i + 0x10]; //need to offset header. Note this is in case of no trainer
+                        CMEM[i+0xC000] = buffer[i + 0x10]; //mirror
+                    }
                 }
                 for(int i = 0; i < header[5]*8192; i++){
                     GMEM[i] = buffer[i + prglen + 0x10];
                 }
+                PC = CMEM[0xFFFC] << 8 | CMEM[0xFFFD];
                 return true;
             case 0x1: mapper = '1'; cout << "Mapper = 1" << endl; break;
             default: cout << "Unknown mapper type" << endl;
