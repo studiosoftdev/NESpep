@@ -18,9 +18,9 @@ unsigned char header [16];
 unsigned char mapper;
 unsigned char CMEM [0xFFFF];
 unsigned char GMEM [0x3FFF];
-int REG [7] = {0,0,0,0,0,0,0}; /// C Z I D B V N in order
+int REG [8] = {0,0,0,0,0,0,0,0}; /// C Z I D BB V N in order
 unsigned char A = 0, X = 0, Y = 0;
-unsigned short PC = 0x8000, SP = 0x100;
+unsigned short PC = 0x8000, SP = 0x100; //starts at 0x100 in RAM.
 
 /* Program entry point */
 
@@ -48,8 +48,8 @@ int main(int argc, char *argv[])
                 CMEM[SP] = ((PC+2) & 0xFF00) >> 8; //need +2 to push the address of the instruction AFTER this JSR to the stack
                 SP++;
                 CMEM[SP] = (PC+2) & 0x00FF; //see above comment
-                cout << hex << "PC: " << PC << " -> " << 0x8000+(instruction & 0xFFFF) << "\t | " << ((instruction & 0xFF0000) >> 16) << " " << (instruction & 0x00FFFF) << "\t | JSR (abs)" << endl;
-                PC = 0x8000 + (instruction & 0xFFFF);
+                cout << hex << "PC: " << PC << " -> " << (instruction & 0xFFFF) << "\t | " << ((instruction & 0xFF0000) >> 16) << " " << (instruction & 0x00FFFF) << "\t | JSR (abs)" << endl;
+                PC = (instruction & 0xFFFF);
                 break;}
             case 0x30: ///BMI - branch if minus (N = 1)
                 {instruction = CMEM[PC] << 8 | CMEM[PC+1] ;
@@ -67,7 +67,10 @@ int main(int argc, char *argv[])
                 long data = CMEM[(X + (instruction & 0x00FF)) & 0x0FF] * 2;  //consequence of zero paged index (in the index), multiply by 2 for shift
                 data += REG[0]; //adding in the carry as the lowest bit
                 REG[0] = data & 0x0F00 >> 16; //moving the shifted out bit to the carry
-                cout << hex << "PC: " << PC << " -> " << PC + 2 << "\t | " << ((instruction & 0xFF00) >> 8) << " " << (instruction & 0x00FF) << "\t | ROL (zpg)" << "\t | temp: C: N: Z: "  << endl;
+                if(data & 0x00FF){REG[1] = 1;} //setting Z = 1 if result = 0
+                else{REG[1] = 0;}
+                REG[7] = data & 0x040; //retrieving bit 7 and putting that in the N register
+                cout << hex << "PC: " << PC << " -> " << PC + 2 << "\t | " << ((instruction & 0xFF00) >> 8) << " " << (instruction & 0x00FF) << "\t | ROL (zpg)" << "\t | temp: C: N: Z:" << REG[1] << endl;
                 break;}
             case 0x60: ///RTS - Return To Subroutine. Pulls 2 bytes off the stack to be the PC.
                 {instruction = CMEM[PC];
@@ -76,7 +79,24 @@ int main(int argc, char *argv[])
                 SP-=2;
                 cout << hex << "PC: " << oldPC << " -> " << PC << "\t | " << instruction << "\t\t | RTS (abs)" << endl;
                 break;}
-            case 0xEA: ///NOP - No OP. Do nothing for 2 cycles.
+            case 0xAD: ///LDA - LoaD Accumulator. Loads value of address. 3 bytes.
+                {instruction = CMEM[PC] << 16 | CMEM[PC+1] << 8 | CMEM[PC+2];
+                A = CMEM[instruction & 0x00FFFF];
+                cout << hex << "PC: " << PC << " -> " << PC+3 << "\t | " << ((instruction & 0xFF0000) >> 16) << " " << (instruction & 0x00FFFF) << "\t | LDA (abs)\t | A: " << int(A) << endl;
+                PC += 3;
+                break;}
+            case 0xC9: ///CMP - CoMPare given value with accumulator. Affects C,Z,N accordingly. 2 bytes.
+                {instruction = CMEM[PC] << 8 | CMEM[PC+1];
+                unsigned int result = A - (instruction & 0x00FF);
+                if(A >= result){REG[0] = 1;} //setting carry to 1 if A >= result
+                if(result == 0){REG[1] = 1;} //Z = 1 if result != 0
+                else{REG[1] = 0;}
+                REG[7] = (result & 0x0040) >> 6; //left shift 6 times in order to isolate it as a single binary digit, 1 or 0.
+                cout << hex << "PC: " << PC << " -> " << PC+2 << "\t | " << ((instruction & 0xFF00) >> 8) << " " << (instruction & 0x00FF) << "\t\t | CMP (imm)\t | C: " << REG[0] << " Z: " << REG[1] <<
+                " N: " << REG[7] << endl;
+                PC += 2;
+                break;}
+            case 0xEA: ///NOP - No OP. Do nothing for 2 cycles. 1 byte.
                 {instruction = CMEM[PC];
                 cout << hex << "PC: " << PC << " -> " << PC+1 << "\t | " << instruction << "\t\t | NOP (imp)" << endl;
                 PC++;
@@ -84,14 +104,19 @@ int main(int argc, char *argv[])
             case 0xEE: ///INC - INCrement memory. Increments value at the address given by the operand by 1. 3 bytes.
                 {instruction = CMEM[PC] << 16 | CMEM[PC+1] << 8 | CMEM[PC+2];
                 CMEM[instruction & 0x00FFFF]++;
-                cout << hex << "PC: " << PC << " -> " << PC+3 << "\t | " << ((instruction & 0xFF0000) >> 16) << " " << (instruction & 0x00FFFF) << "\t | INC (abs)\t | CMEM[" << (instruction & 0x00FFFF) <<"] = " << int(CMEM[(instruction & 0x00FFFF)]) - 1 << " -> " << int(CMEM[(instruction & 0x00FFFF)]) << endl;
+                if(CMEM[instruction & 0x00FFFF] == 0){REG[1] = 1;} //setting Z to 1 if CMEM[operand] = 0 *AFTER* the increment.
+                else{REG[1] = 0;}
+                REG[7] = CMEM[instruction & 0x00FFFF] & 0x40; //setting N flag to the 7th bit.
+                cout << hex << "PC: " << PC << " -> " << PC+3 << "\t | " << ((instruction & 0xFF0000) >> 16) << " " << (instruction & 0x00FFFF) << "\t | INC (abs)\t | CMEM[" <<
+                (instruction & 0x00FFFF) << "] = " << int(CMEM[(instruction & 0x00FFFF)]) - 1 << " -> " << int(CMEM[(instruction & 0x00FFFF)]) << "\t | Z: " << int(REG[1]) << " N: " << int(REG[7]) << endl;
                 PC += 3;
                 break;}
-            case 0xAD: ///LDA - LoaD Accumulator. Loads value of address. 3 bytes.
-                {instruction = CMEM[PC] << 16 | CMEM[PC+1] << 8 | CMEM[PC+2];
-                A = CMEM[instruction & 0x00FFFF];
-                cout << hex << "PC: " << PC << " -> " << PC+3 << "\t | " << ((instruction & 0xFF0000) >> 16) << " " << (instruction & 0x00FFFF) << "\t | LDA (abs)\t | A: " << int(A) << endl;
-                PC += 3;
+            case 0xF0: ///BEQ - Branch if EQual. Branch (add operand to PC) if Z = 1. 2 Bytes.
+                {instruction = CMEM[PC] << 8 | CMEM[PC+1];
+                cout << hex << "PC: " << PC << " -> ";
+                if(REG[1] == 1){PC += (instruction & 0x00FF);}
+                else{PC += 2;}
+                cout << PC << "\t | " << ((instruction & 0xFF00) >> 8) << " " << (instruction & 0x00FF) << "\t\t | BEQ (rel)" << endl;
                 break;}
 
             default: cout << "Unknown opcode" << endl;
