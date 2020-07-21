@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
                 cout << hex << "PC: " << PC << " -> " << PC + 2 << "\t | " << ((instruction & 0xFF00) >> 8) << " " << (instruction & 0x00FF) << "\t | ROL (zpg)\t | temp: C: N: Z:" << REG[1] << endl;
                 break;}
             case 0x4C: ///JMP - JuMP. Set PC to operand. 3 bytes.
-                {instruction = CMEM[PC] << 16 | CMEM[PC+1] << 8 | CMEM[PC];
+                {instruction = CMEM[PC] << 16 | CMEM[PC+1] << 8 | CMEM[PC+2];
                 cout << hex << "PC: " << PC << " -> ";
                 PC = instruction& 0x00FFFF;
                 cout << hex << PC << "\t | " << ((instruction & 0xFF0000) >> 16) << " " << (instruction & 0x00FFFF) << "\t | JMP (abs)" << endl;
@@ -85,10 +85,47 @@ int main(int argc, char *argv[])
                 SP-=2;
                 cout << hex << "PC: " << oldPC << " -> " << PC << "\t | " << instruction << "\t\t | RTS (abs)" << endl;
                 break;}
+            case 0x65: ///ADC - ADd with Carry. Sets carry with overflow, adds zero page index to acc. 2 Bytes.
+                {instruction = CMEM[PC] << 8 | CMEM[PC+1];
+                if((A+CMEM[instruction&0x00FF])&0xFF == (A+CMEM[instruction&0x00FF])){
+                    REG[0] = 1;
+                }
+                A = (A+CMEM[instruction&0x00FF])&0xFF;
+                break;}
+            case 0x69: ///ADC - ADd with Carry. Sets carry with overflow, adds number to accumulator. 2 Bytes.
+                {instruction = CMEM[PC] << 8 | CMEM[PC+1];
+                if((A+(instruction&0x00FF))&0xFF == (A+(instruction&0x00FF))){
+                    REG[0] = 1;
+                }
+                A = (A+(instruction&0x00FF))&0xFF;
+                PC += 2;
+                cout << "ADC (imm)\n";
+                break;}
+            case 0xA2: ///LDX - LoaD X register. Loads given byte into X. 2 bytes.
+                {instruction = CMEM[PC] << 8 | CMEM[PC+1];
+                X = instruction & 0x00FF;
+                if(X == 0){REG[1] = 1;}
+                else{REG[1] = 0;}
+                REG[7] = X & 0x40;
+                cout << hex << "PC: " << PC << " -> " << PC+2 << "\t | " << ((instruction & 0xFF00) >> 8) << " " << (instruction & 0x00FF) << "\t\t | LDX (imm)\t | A: " << int(A) << " Z: " << REG[1] << " N: " << REG[7] << endl;
+                PC += 2;
+                break;}
+            case 0xA9: ///LDA - LoaD Accumulator. Loads value of operand into A. 2 Bytes.
+                {instruction = CMEM[PC] << 8 | CMEM[PC+1];
+                A = instruction & 0x00FF;
+                if(A == 0){REG[1] = 1;}
+                else{REG[1] = 0;}
+                REG[7] = A & 0x40;
+                cout << hex << "PC: " << PC << " -> " << PC+2 << "\t | " << ((instruction & 0xFF00) >> 8) << " " << (instruction & 0x00FF) << "\t | LDA (imm)\t | A: " << int(A) << " Z: " << REG[1] << " N: " << REG[7] << endl;
+                PC += 2;
+                break;}
             case 0xAD: ///LDA - LoaD Accumulator. Loads value of address. 3 bytes.
                 {instruction = CMEM[PC] << 16 | CMEM[PC+1] << 8 | CMEM[PC+2];
                 A = CMEM[instruction & 0x00FFFF];
-                cout << hex << "PC: " << PC << " -> " << PC+3 << "\t | " << ((instruction & 0xFF0000) >> 16) << " " << (instruction & 0x00FFFF) << "\t | LDA (abs)\t | A: " << int(A) << endl;
+                if(A == 0){REG[1]=1;}
+                else{REG[1]=0;}
+                REG[7] = A & 0x40;
+                cout << hex << "PC: " << PC << " -> " << PC+3 << "\t | " << ((instruction & 0xFF0000) >> 16) << " " << (instruction & 0x00FFFF) << "\t | LDA (abs)\t | A: " << int(A) << " Z: " << REG[1] << " N: " << REG[7] << endl;
                 PC += 3;
                 break;}
             case 0xC9: ///CMP - CoMPare given value with accumulator. Affects C,Z,N accordingly. 2 bytes.
