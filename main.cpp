@@ -1,4 +1,4 @@
-#ifdef __APPLE__
+/*#ifdef __APPLE__
 #include <GLUT/glut.h>
 #else
 #include <GL/glut.h>
@@ -22,7 +22,7 @@ int REG [8] = {0,0,0,0,0,0,0,0}; /// C Z I D BB V N in order
 unsigned char A = 0, X = 0, Y = 0, P = 0x34;
 unsigned short PC = 0x0000, SP = 0x100; //starts at 0x100 in RAM.
 
-/* Program entry point */
+/* Program entry point
 
 int main(int argc, char *argv[])
 {
@@ -91,6 +91,7 @@ int main(int argc, char *argv[])
                     REG[0] = 1;
                 }
                 A = (A+CMEM[instruction&0x00FF])&0xFF;
+                cout << "ADC (zpg)\n";
                 break;}
             case 0x69: ///ADC - ADd with Carry. Sets carry with overflow, adds number to accumulator. 2 Bytes.
                 {instruction = CMEM[PC] << 8 | CMEM[PC+1];
@@ -101,6 +102,10 @@ int main(int argc, char *argv[])
                 PC += 2;
                 cout << "ADC (imm)\n";
                 break;}
+            case 0x75: ///ADC - ADd with Carry. Sets carry with overflow, adds zero page x index to acc. 2 Bytes.
+                {instruction  = CMEM[PC] << 8 | CMEM[PC+1];
+
+                }
             case 0xA2: ///LDX - LoaD X register. Loads given byte into X. 2 bytes.
                 {instruction = CMEM[PC] << 8 | CMEM[PC+1];
                 X = instruction & 0x00FF;
@@ -222,7 +227,7 @@ char loadGame(const char *filename){
                 for(int i = 0; i < header[5]*8192; i++){
                     GMEM[i] = buffer[i + prglen + 0x10];
                 }
-                PC = CMEM[0xFFFC] << 8 | CMEM[0xFFFD];
+                PC = CMEM[0xFFFD] << 8 | CMEM[0xFFFC];
                 return true;
             case 0x1: mapper = '1'; cout << "Mapper = 1" << endl; break;
             default: cout << "Unknown mapper type" << endl;
@@ -241,3 +246,4 @@ char loadGame(const char *filename){
     Sleep(30000);
 	return false;
 }
+*/
