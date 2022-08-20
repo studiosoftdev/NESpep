@@ -12,6 +12,7 @@ constexpr auto HASHES = "#######################################################
 typedef unsigned short u16;
 typedef unsigned char u8;
 typedef __int16_t i16;
+typedef signed char i8;
 
 using namespace std;
 
@@ -88,6 +89,8 @@ int main(int argc, char* argv[])
     }
     cout << (int)CMEM[0x8001] << endl;
     cout << (int)GMEM[0x0001] << endl;
+    signed char t = -((~(0xFB)) + 1);
+    cout << int(0xFB) << " : " << int(t) << endl;
     cout << HASHES;
     while (!errorstate) {
         emulateCPUcycle();
@@ -108,6 +111,7 @@ void dumpStateOutput() {
 }
 
 u16 getAddrFromAddrMode(int addrmode) {
+    signed char t = 0xFB; //used to help convert between signed and unsigned integers for relative addressing (9)
     switch (addrmode) {
     case 1: ///A - operand is from Accumulator.
         pcInc = 1; addrname = 0;
@@ -135,7 +139,7 @@ u16 getAddrFromAddrMode(int addrmode) {
         return CMEM[CMEM[PC + 1] + Y];
     case 9: ///rel - relative, operand is added to PC (operand is signed int)
         pcInc = 2; addrname = 8;
-        return CMEM[PC + (CMEM[PC + 1] - 0x80)];
+        return PC + (signed char)CMEM[PC+1];
     case 10: ///zpg - zero page, value is located at CMEM[operand] where operand is 1 byte
         pcInc = 2; addrname = 8;
         return CMEM[PC + 1];
@@ -189,14 +193,20 @@ void emulateCPUcycle() {
         PC += pcInc;
         cout << "ASL (postop) | ";
         break;
-    case 4: cout << "BCC (preop)  | "; dumpStateOutput(); //not implmented (Branch on Carry Clear (rel))
+    case 4: cout << "BCC (preop)  | "; dumpStateOutput(); //BCC. Branch if C = 0. Relative address.
+        PC = REG[0] == 0 ? operand : PC + pcInc;
+        cout << "BCC (postop)  | ";
+        break;
+    case 5: cout << "BCS (preop)  | "; dumpStateOutput(); //BCS. Branch if C = 1. Relative address.
+        PC = REG[0] == 1 ? operand : PC + pcInc;
+        cout << "BCS (postop)  | ";
         break;
     case 9: cout << "BNE (preop)  | "; dumpStateOutput(); ///BNE. Branch if Not Equal (Z = 0) to relative address.
-        PC = (REG[1] == 0) ? PC + (~operand + 1) : PC + pcInc;
+        PC = (REG[1] == 0) ? operand : PC + pcInc; // is (~operand + 1) correct ?
         cout << "BNE (postop) | ";
         break;
     case 10: cout << "BPL (preop)  | "; dumpStateOutput(); ///BPL. Branch if N = 0 to relative address.
-        PC = (REG[7] == 0) ? PC + (~operand + 1) : PC + pcInc;
+        PC = (REG[7] == 0) ? operand : PC + pcInc;
         cout << "BPL (postop) | ";
         break;
     case 15: cout << "CLD (preop)  | "; dumpStateOutput(); ///CLD. Clear Decimal. Sets D = 0 (REG[3])
