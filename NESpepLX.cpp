@@ -142,7 +142,7 @@ u16 getAddrFromAddrMode(int addrmode) {
         return PC + (signed char)CMEM[PC+1];
     case 10: ///zpg - zero page, value is located at CMEM[operand] where operand is 1 byte
         pcInc = 2; addrname = 8;
-        return CMEM[PC + 1];
+        return PC+1;
     case 11: ///zpg,x - zero page x indexed, value is located at CMEM[operand+X]
         pcInc = 2; addrname = 10;
         return CMEM[(CMEM[PC + 1] + X) % 0x100];
@@ -201,6 +201,20 @@ void emulateCPUcycle() {
         PC = REG[0] == 1 ? operand : PC + pcInc;
         cout << "BCS (postop)  | ";
         break;
+    case 6: cout << "BEQ (preop)  | "; dumpStateOutput(); //BEQ. Branch if Z = 1. Relative address.
+        PC = REG[1] == 1 ? operand : PC + pcInc;
+        cout << "BEQ (postop)  | ";
+        break;
+    case 7: cout << "BIT (preop)  | "; dumpStateOutput(); //BIT. BIt Test with accumulator. bits 7, 6 of operand moved to N,V. Z set to operand AND accumulator.
+        REG[6] = (CMEM[operand] & 0x40) >> 6;
+        REG[7] = (CMEM[operand] & 0x80) >> 7;
+        REG[1] = (CMEM[operand] & A) == 0 ? 1 : 0;
+        cout << "BIT (postop)  | "; dumpStateOutput();
+        break;
+    case 8: cout << "BMI (preop)  | "; dumpStateOutput(); //BMI. Branch on MInus. Branch if N = 1.
+         PC = (REG[7] == 1) ? operand : PC + pcInc;
+        cout << "BMI (postop) | ";
+        break;
     case 9: cout << "BNE (preop)  | "; dumpStateOutput(); ///BNE. Branch if Not Equal (Z = 0) to relative address.
         PC = (REG[1] == 0) ? operand : PC + pcInc; // is (~operand + 1) correct ?
         cout << "BNE (postop) | ";
@@ -208,6 +222,10 @@ void emulateCPUcycle() {
     case 10: cout << "BPL (preop)  | "; dumpStateOutput(); ///BPL. Branch if N = 0 to relative address.
         PC = (REG[7] == 0) ? operand : PC + pcInc;
         cout << "BPL (postop) | ";
+        break;
+    case 12: cout << "BVC (preop)  | "; dumpStateOutput(); ///BPL. Branch if V = 0 to relative address.
+        PC = (REG[6] == 0) ? operand : PC + pcInc;
+        cout << "BVC (postop) | ";
         break;
     case 15: cout << "CLD (preop)  | "; dumpStateOutput(); ///CLD. Clear Decimal. Sets D = 0 (REG[3])
         REG[3] = 0;
