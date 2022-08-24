@@ -223,9 +223,13 @@ void emulateCPUcycle() {
         PC = (REG[7] == 0) ? operand : PC + pcInc;
         cout << "BPL (postop) | ";
         break;
-    case 12: cout << "BVC (preop)  | "; dumpStateOutput(); ///BPL. Branch if V = 0 to relative address.
+    case 12: cout << "BVC (preop)  | "; dumpStateOutput(); ///BVC. Branch if V = 0 to relative address.
         PC = (REG[6] == 0) ? operand : PC + pcInc;
         cout << "BVC (postop) | ";
+        break;
+    case 13: cout << "BVS (preop)  | "; dumpStateOutput(); ///BVS. Branch if V = 1 to relative address.
+        PC = (REG[6] == 1) ? operand : PC + pcInc;
+        cout << "BVS (postop) | ";
         break;
     case 15: cout << "CLD (preop)  | "; dumpStateOutput(); ///CLD. Clear Decimal. Sets D = 0 (REG[3])
         REG[3] = 0;
