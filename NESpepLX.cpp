@@ -223,6 +223,14 @@ void emulateCPUcycle() {
         PC = (REG[7] == 0) ? operand : PC + pcInc;
         cout << "BPL (postop) | ";
         break;
+    case 11: cout << "BRK (preop)  | "; dumpStateOutput(); //BRK. Force Break. Push PC+2 to Stack, push SR to Stack with B=1. I = 1.
+        CMEM[0x100 + SP] = CMEM[PC+2]; //adding return addr
+        SP--;
+        REG[2] = 1; //setting I flag
+        CMEM[0x100 + SP] = REG[0] | (REG[1] << 1) | (REG[2] << 2) | (REG[3] << 3) | (REG[4] << 4) | (REG[5] << 5) | (REG[6] << 6) | (REG[7] << 7);
+        SP--;
+        PC = CMEM[0xFFFF] << 8 | CMEM[0xFFFE]; //set PC to IRQ vector (?)
+        break;
     case 12: cout << "BVC (preop)  | "; dumpStateOutput(); ///BVC. Branch if V = 0 to relative address.
         PC = (REG[6] == 0) ? operand : PC + pcInc;
         cout << "BVC (postop) | ";
@@ -231,10 +239,25 @@ void emulateCPUcycle() {
         PC = (REG[6] == 1) ? operand : PC + pcInc;
         cout << "BVS (postop) | ";
         break;
+    case 14: cout << "CLC (preop)  | "; dumpStateOutput(); ///CLC. Clear Carry. Sets C = 0 (REG[0])
+        REG[0] = 0;
+        PC += pcInc;
+        cout << "CLC (postop) | ";
+        break;
     case 15: cout << "CLD (preop)  | "; dumpStateOutput(); ///CLD. Clear Decimal. Sets D = 0 (REG[3])
         REG[3] = 0;
         PC += pcInc;
         cout << "CLD (postop) | ";
+        break;
+    case 16: cout << "CLI(preop)  | "; dumpStateOutput(); ///CLI. Clear Interrupt. Sets I = 0 (REG[2])
+        REG[2] = 0;
+        PC += pcInc;
+        cout << "CLI (postop) | ";
+        break;
+    case 17: cout << "CLV (preop)  | "; dumpStateOutput(); ///CLV. Clear Overflow. Sets V = 0 (REG[6])
+        REG[6] = 0;
+        PC += pcInc;
+        cout << "CLV (postop) | ";
         break;
     case 23: cout << "DEY (preop)  | "; dumpStateOutput(); ///DEY. Y--; Affects Z,N.
         Y--;
