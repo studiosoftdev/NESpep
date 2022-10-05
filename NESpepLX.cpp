@@ -78,7 +78,6 @@ int addrmode[0x100] = //make a function for the addressing modes to return the a
 
 int main(int argc, char* argv[])
 {
-    //cout << "oreo" << endl;
     srand(time(0));
     if (argc < 2) { //has to load with game
         cout << "No file loaded." << endl;
@@ -113,40 +112,40 @@ void dumpStateOutput() {
 u16 getAddrFromAddrMode(int addrmode) {
     signed char t = 0xFB; //used to help convert between signed and unsigned integers for relative addressing (9)
     switch (addrmode) {
-    case 1: ///A - operand is from Accumulator.
+    case 1: ///A - operand is from Accumulator. Returns value.
         pcInc = 1; addrname = 0;
         return A;
-    case 2: ///abs - operand is the value at given (next 2 bytes, an address is the value)
+    case 2: ///abs - operand is the value at given (next 2 bytes, an address is the value). Returns address.
         pcInc = 3; addrname = 1;
         return (CMEM[PC + 2] << 8) | CMEM[PC + 1];
-    case 3: ///abs,x - operand is the address given + X
+    case 3: ///abs,x - operand is the address given + X. Returns address.
         pcInc = 3; addrname = 2;
-        return (CMEM[PC + 2] | CMEM[PC + 1]) + X;
-    case 4: ///abs,y - operand is the address given + Y
+        return (CMEM[PC + 2] << 8 | CMEM[PC + 1]) + X;
+    case 4: ///abs,y - operand is the address given + Y. Returns address.
         pcInc = 3; addrname = 3;
-        return (CMEM[PC + 2] | CMEM[PC + 1]) + Y;
-    case 5: ///imm - immediate, value is the operand
+        return (CMEM[PC + 2] << 8 | CMEM[PC + 1]) + Y;
+    case 5: ///imm - immediate, value is the operand. Returns value.
         pcInc = 2; addrname = 4;
         return CMEM[PC + 1];
-    case 6: ///imp - implied, doesn't need an address/it is not given by an operand.
+    case 6: ///imp - implied, doesn't need an address/it is not given by an operand. Returns value.
         pcInc = 1; addrname = 5;
         return 0xFFFF;
-    case 7: ///ind,x - indexed indirect: value located at address given by operand+x on zpg
+    case 7: ///ind,x - indexed indirect: value located at address given by operand+x on zpg. Returns value at address.
         pcInc = 2; addrname = 6;
         return CMEM[(CMEM[PC + 1] + X) % 0x100];
-    case 8: ///ind,y - indirect indexed: value located at zpg[operand] + Y. zpg contains only LSByte
+    case 8: ///ind,y - indirect indexed: value located at zpg[operand] + Y. zpg contains only LSByte. Returns value at address.
         pcInc = 2; addrname = 7;
         return CMEM[CMEM[PC + 1] + Y];
-    case 9: ///rel - relative, operand is added to PC (operand is signed int)
+    case 9: ///rel - relative, operand is added to PC (operand is signed int). Returns address.
         pcInc = 2; addrname = 8;
         return PC + (signed char)CMEM[PC+1];
-    case 10: ///zpg - zero page, value is located at CMEM[operand] where operand is 1 byte
+    case 10: ///zpg - zero page, value is located at CMEM[operand] where operand is 1 byte. Returns address.
         pcInc = 2; addrname = 8;
         return PC+1;
-    case 11: ///zpg,x - zero page x indexed, value is located at CMEM[operand+X]
+    case 11: ///zpg,x - zero page x indexed, value is located at CMEM[operand+X]. Returns value at address.
         pcInc = 2; addrname = 10;
         return CMEM[(CMEM[PC + 1] + X) % 0x100];
-    case 12: ///zpg,y - zero page y indexed, value is located at CMEM[operand+Y]
+    case 12: ///zpg,y - zero page y indexed, value is located at CMEM[operand+Y]. Returns value at address.
         pcInc = 2; addrname = 11;
         return CMEM[(CMEM[PC + 1] + Y) % 0x100];
     case 13: ///ind - indirect: used only for JMP, returns an address given by the 2Byte address in operand
@@ -161,6 +160,7 @@ void emulateCPUcycle() {
     unsigned int instruction; //max 4 bytes per instruction
     u8 opcode = CMEM[PC];
     u16 operand = getAddrFromAddrMode(addrmode[opcode]); //need to account for how many bytes to skip with PC somehow
+    u8 val; //temp val if needs to be used
 
     switch (opcodes[opcode]) {
     case 1: cout << "ADC (preop)  | "; dumpStateOutput(); ///ADC. Add operand to A, set carry flag if necessary
@@ -258,6 +258,45 @@ void emulateCPUcycle() {
         REG[6] = 0;
         PC += pcInc;
         cout << "CLV (postop) | ";
+        break;
+    case 18: cout << "CMP (preop)  | "; dumpStateOutput(); ///CMP. Compare Memory with Accumulator. Affects NZC(7,1,0).
+        val = CMEM[operand];
+        REG[0] = val - A > 0 ? 1 : 0;
+        REG[1] = val - A == 0 ? 1 : 0;
+        REG[7] = val - A < 0 ? 1 : 0;
+        PC += pcInc;
+        cout << "CMP (postop) | "
+        break;
+    case 19: cout << "CPX (preop)  | "; dumpStateOutput(); ///CPX. Compare Memory with X. Affects NZC(7,1,0).
+        val = CMEM[operand];
+        REG[0] = val - X > 0 ? 1 : 0;
+        REG[1] = val - X == 0 ? 1 : 0;
+        REG[7] = val - X < 0 ? 1 : 0;
+        PC += pcInc;
+        cout << "CPX (postop) | "
+        break;
+    case 20: cout << "CPY (preop)  | "; dumpStateOutput(); ///CPY. Compare Memory with Y. Affects NZC(7,1,0).
+        val = CMEM[operand];
+        REG[0] = val - Y > 0 ? 1 : 0;
+        REG[1] = val - Y == 0 ? 1 : 0;
+        REG[7] = val - Y < 0 ? 1 : 0;
+        PC += pcInc;
+        cout << "CPY (postop) | "
+        break;
+    case 21: cout << "DEC (preop)  | "; dumpStateOutput(); ///DEC. CMEM[operand]--; Affects Z,N (7,1).
+        CMEM[operand]--;
+        REG[1] = CMEM[operand] < 0 ? 1 : 0;
+        REG[7] = CMEM[operand] == 0 ? 1 : 0;
+        PC += pcInc;
+        cout << "DEC (postop) | ";
+        break;
+    case 22: cout << "DEX (preop)  | "; dumpStateOutput(); ///DEX. X--; Affects Z,N.
+        Y--;
+        if (Y == 0) { REG[1] = 1; }
+        else { REG[1] = 0; }
+        REG[7] == (Y & 0x80) >> 7;
+        PC += pcInc;
+        cout << "DEX (postop) | "; 
         break;
     case 23: cout << "DEY (preop)  | "; dumpStateOutput(); ///DEY. Y--; Affects Z,N.
         Y--;
@@ -391,4 +430,3 @@ char loadGame(const char* filename) {
     //Sleep(30000);
     return false;
 }
-
