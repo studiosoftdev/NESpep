@@ -148,11 +148,15 @@ u16 getAddrFromAddrMode(int addrmode) {
     case 12: ///zpg,y - zero page y indexed, value is located at CMEM[operand+Y]. Returns value at address.
         pcInc = 2; addrname = 11;
         return CMEM[(CMEM[PC + 1] + Y) % 0x100];
-    case 13: ///ind - indirect: used only for JMP, returns an address given by the 2Byte address in operand
+    case 13: { ///ind - indirect: used only for JMP, returns an address given by the 2Byte address in operand
         pcInc = 3; addrname = 12;
-        return (CMEM[((CMEM[PC + 2] << 8) | CMEM[PC + 1]) + 1] << 8) | CMEM[(CMEM[PC + 2] << 8) | CMEM[PC + 1]];
+        u8 LByte = CMEM[PC+1];
+        u8 HByte = CMEM[PC%100 | (CMEM[PC] << 8)];
+        return (HByte << 8) | LByte;}
+        //return (CMEM[((CMEM[PC + 2] << 8) | CMEM[PC + 1]) + 1] << 8) | CMEM[(CMEM[PC + 2] << 8) | CMEM[PC + 1]];
     default: cout << "Unknown address mode: " << addrmode << endl;
         errorstate = true;
+        return 0xFFFF;
     }
 }
 
@@ -265,7 +269,7 @@ void emulateCPUcycle() {
         REG[1] = val - A == 0 ? 1 : 0;
         REG[7] = val - A < 0 ? 1 : 0;
         PC += pcInc;
-        cout << "CMP (postop) | "
+        cout << "CMP (postop) | ";
         break;
     case 19: cout << "CPX (preop)  | "; dumpStateOutput(); ///CPX. Compare Memory with X. Affects NZC(7,1,0).
         val = CMEM[operand];
@@ -273,7 +277,7 @@ void emulateCPUcycle() {
         REG[1] = val - X == 0 ? 1 : 0;
         REG[7] = val - X < 0 ? 1 : 0;
         PC += pcInc;
-        cout << "CPX (postop) | "
+        cout << "CPX (postop) | ";
         break;
     case 20: cout << "CPY (preop)  | "; dumpStateOutput(); ///CPY. Compare Memory with Y. Affects NZC(7,1,0).
         val = CMEM[operand];
@@ -281,7 +285,7 @@ void emulateCPUcycle() {
         REG[1] = val - Y == 0 ? 1 : 0;
         REG[7] = val - Y < 0 ? 1 : 0;
         PC += pcInc;
-        cout << "CPY (postop) | "
+        cout << "CPY (postop) | ";
         break;
     case 21: cout << "DEC (preop)  | "; dumpStateOutput(); ///DEC. CMEM[operand]--; Affects Z,N (7,1).
         CMEM[operand]--;
@@ -291,10 +295,10 @@ void emulateCPUcycle() {
         cout << "DEC (postop) | ";
         break;
     case 22: cout << "DEX (preop)  | "; dumpStateOutput(); ///DEX. X--; Affects Z,N.
-        Y--;
-        if (Y == 0) { REG[1] = 1; }
+        X--;
+        if (X == 0) { REG[1] = 1; }
         else { REG[1] = 0; }
-        REG[7] == (Y & 0x80) >> 7;
+        REG[7] == (X & 0x80) >> 7;
         PC += pcInc;
         cout << "DEX (postop) | "; 
         break;
@@ -306,6 +310,34 @@ void emulateCPUcycle() {
         PC += pcInc;
         cout << "DEY (postop) | "; 
         break;
+    case 25: cout << "INC (preop)  | "; dumpStateOutput(); ///INC. CMEM[operand]++; Affects Z,N (7,1).
+        CMEM[operand]++;
+        REG[1] = CMEM[operand] < 0 ? 1 : 0;
+        REG[7] = CMEM[operand] == 0 ? 1 : 0;
+        PC += pcInc;
+        cout << "INC (postop) | ";
+        break;
+    case 26: cout << "INX (preop)  | "; dumpStateOutput(); ///INX. X++; Affects Z,N.
+        X++;
+        if (X == 0) { REG[1] = 1; }
+        else { REG[1] = 0; }
+        REG[7] == (X & 0x80) >> 7;
+        PC += pcInc;
+        cout << "INX (postop) | "; 
+        break;
+    case 27: cout << "INY (preop)  | "; dumpStateOutput(); ///INX. Y++; Affects Z,N.
+        Y++;
+        if (Y == 0) { REG[1] = 1; }
+        else { REG[1] = 0; }
+        REG[7] == (Y & 0x80) >> 7;
+        PC += pcInc;
+        cout << "INY (postop) | "; 
+        break;
+    case 28: cout << "JMP (preop)  | "; dumpStateOutput(); ///JMP. PC <- operand.
+    //to consider: an indirect jump does not cross page boundaries, high byte will wrap around to lowest of page boundary
+        PC = operand;
+        cout << "JMP (postop) | ";
+        break;
     case 29: cout << "JSR (preop)  | "; dumpStateOutput(); ///JSR. pushes the address -1 of the current addr on to the stack and then sets the program counter to operand.
         CMEM[SP+0x100] = PC - 1;
         SP--;
@@ -313,7 +345,7 @@ void emulateCPUcycle() {
         cout << "JSR (postop) | ";
         break;
     case 30: cout << "LDA (preop)  | "; dumpStateOutput(); ///LDA. Load into A.
-        A = operand;
+        A = CMEM[operand];
         REG[1] = (A == 0) ? 1 : 0;
         REG[7] = (A & 0x80) >> 7;
         PC += pcInc;
@@ -412,6 +444,7 @@ char loadGame(const char* filename) {
                 GMEM[i] = buffer[i + prglen + 0x10];
             }
             PC = CMEM[0xFFFD] << 8 | CMEM[0xFFFC];
+            cout << hex << PC << endl;
             return true;
         case 0x1: mapper = '1'; cout << "Mapper = 1" << endl; break;
         default: cout << "Unknown mapper type" << endl;
