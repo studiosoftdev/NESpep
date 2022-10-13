@@ -1,4 +1,4 @@
-#include <GL/glut.h>
+//#include <GL/glut.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <iomanip>
@@ -296,19 +296,24 @@ void emulateCPUcycle() {
         break;
     case 22: cout << "DEX (preop)  | "; dumpStateOutput(); ///DEX. X--; Affects Z,N.
         X--;
-        if (X == 0) { REG[1] = 1; }
-        else { REG[1] = 0; }
+        REG[1] = X == 0 ? 1 : 0;
         REG[7] == (X & 0x80) >> 7;
         PC += pcInc;
         cout << "DEX (postop) | "; 
         break;
     case 23: cout << "DEY (preop)  | "; dumpStateOutput(); ///DEY. Y--; Affects Z,N.
         Y--;
-        if (Y == 0) { REG[1] = 1; }
-        else { REG[1] = 0; }
+        REG[1] = Y == 0 ? 1 : 0;
         REG[7] == (Y & 0x80) >> 7;
         PC += pcInc;
         cout << "DEY (postop) | "; 
+        break;
+    case 24: cout << "EOR (preop)  | "; dumpStateOutput(); ///EOR. CMEM[operand] ^ A -> A. Affects Z,N (7,1).
+        A = A ^ CMEM[operand];
+        REG[7] = A == 0 ? 1 : 0;
+        REG[1] = (A & 0x80) >> 7;
+        PC += pcInc;
+        cout << "EOR (postop) | ";
         break;
     case 25: cout << "INC (preop)  | "; dumpStateOutput(); ///INC. CMEM[operand]++; Affects Z,N (7,1).
         CMEM[operand]++;
@@ -319,16 +324,14 @@ void emulateCPUcycle() {
         break;
     case 26: cout << "INX (preop)  | "; dumpStateOutput(); ///INX. X++; Affects Z,N.
         X++;
-        if (X == 0) { REG[1] = 1; }
-        else { REG[1] = 0; }
+        REG[1] = X == 0 ? 1 : 0;
         REG[7] == (X & 0x80) >> 7;
         PC += pcInc;
         cout << "INX (postop) | "; 
         break;
     case 27: cout << "INY (preop)  | "; dumpStateOutput(); ///INX. Y++; Affects Z,N.
         Y++;
-        if (Y == 0) { REG[1] = 1; }
-        else { REG[1] = 0; }
+        REG[1] = Y == 0 ? 1 : 0;
         REG[7] == (Y & 0x80) >> 7;
         PC += pcInc;
         cout << "INY (postop) | "; 
@@ -364,6 +367,26 @@ void emulateCPUcycle() {
         REG[7] = (Y & 0x80) >> 7;
         PC += pcInc;
         cout << "LDY (postop) | ";
+        break;
+    case 33: cout << "LSR (preop)  | "; dumpStateOutput(); ///LSR. Shift Right (1 bit). Affects Z,C (1,0), sets N (7) = 0
+        if(addrmode[opcode] == 1) A >> 1; //shift acc
+        else CMEM[operand] >> 1;
+        REG[0] = addrmode[opcode] == 1 ? (A == 0 ? 1 : 0) : (CMEM[operand] == 0 ? 1 : 0);
+        REG[1] = addrmode[opcode] == 1 ? (A & 0x80) >> 7 : (CMEM[operand] & 0x80) >> 7;
+        REG[7] = 0;
+        PC += pcInc;
+        cout << "LSR (postop) | ";
+        break;
+    case 34: cout << "NOP (preop)  | "; dumpStateOutput(); ///NOP. Does nothing but take 2 cycles
+        PC += pcInc;
+        cout << "NOP (postop) | ";
+        break;
+    case 35: cout << "ORA (preop)  | "; dumpStateOutput(); ///ORA. OR with Acc. Affects N,Z (7,1).
+        A |= CMEM[operand];
+        REG[7] = A == 0 ? 1 : 0;
+        REG[1] = (A & 0x80) >> 7;
+        PC += pcInc;
+        cout << "ORA (postop) | ";
         break;
     case 47: cout << "SEI (preop)  | "; dumpStateOutput(); ///SEI. Set interrupt disable, sets I = 1 (REG[2])
         REG[2] = 1;
